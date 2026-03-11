@@ -29,7 +29,7 @@ Sensor data is transmitted wirelessly to a Raspberry Pi server where a Flask-bas
 - Raspberry Pi
 - Li-ion Battery
 - TP4056 Charging Module
-- AMS1117 Voltage Regulator
+- LM2596 Buck Converter
 - Connecting Wires / Prototype Board
 
 ---
