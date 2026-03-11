@@ -1,2 +1,90 @@
-# PhysioTrack
-PhysioTrack is an IoT-based ankle rehabilitation monitoring system that tracks dorsiflexion, plantarflexion, inversion, and eversion using an MPU6050 sensor and ESP8266. Data is sent to a Raspberry Pi Flask server that guides exercises through a web interface and records session statistics for rehabilitation monitoring.
+# PhysioTrack – Smart Ankle Rehabilitation Monitoring System
+
+PhysioTrack is an IoT-based ankle rehabilitation monitoring system designed to assist physiotherapy patients in performing ankle exercises correctly. The system measures ankle joint movements in real time using an MPU6050 IMU sensor connected to an ESP8266 microcontroller and provides guided feedback through a web interface.
+
+The project tracks four major ankle rehabilitation movements:
+
+- Dorsiflexion
+- Plantarflexion
+- Inversion
+- Eversion
+
+Sensor data is transmitted wirelessly to a Raspberry Pi server where a Flask-based web application processes the movement and provides feedback to the user.
+
+---
+
+# System Architecture
+
+![System Architecture](Images/Sys Architecture.png)
+
+*Insert system architecture diagram here.*
+
+---
+
+# Hardware Components
+
+- ESP8266 (NodeMCU)
+- MPU6050 IMU Sensor
+- Raspberry Pi
+- Li-ion Battery
+- TP4056 Charging Module
+- AMS1117 Voltage Regulator
+- Connecting Wires / Prototype Board
+
+---
+
+# Product Prototype
+
+![Prototype](Images/Prototype.jpg)
+
+*Insert image of the hardware prototype attached to the foot or wearable sock.*
+
+---
+
+# Software Stack
+
+- **Python (Flask)** – Backend server
+- **HTML / CSS / JavaScript** – Web interface
+- **SQLite** – Database for session data
+- **Arduino Framework** – ESP8266 firmware
+
+---
+
+# Website Interface
+
+![Website Screenshot](Images/Web1.png)
+![Website Screenshot 2](Images/Web2.png)
+*Insert screenshot of the PhysioTrack web interface.*
+
+---
+
+# Features
+
+- Real-time ankle movement monitoring
+- Guided physiotherapy exercises
+- Threshold-based movement validation
+- Session-based rehabilitation tracking
+- Automatic logging of average and maximum angles
+- Web-based interface for user interaction
+
+---
+
+# How It Works
+
+1. The MPU6050 sensor measures foot orientation and acceleration.
+2. ESP8266 processes the data and calculates ankle movement angles.
+3. Sensor data is sent to a Raspberry Pi server via WiFi.
+4. The Flask server analyzes the angles against predefined thresholds.
+5. The web interface provides real-time feedback to the user.
+6. Session statistics are stored in the database for rehabilitation tracking.
+
+---
+
+# Future Improvements
+
+- Integration into a wearable rehabilitation sock
+- Addition of EMG sensors to monitor muscle activation
+- Machine learning models to analyze rehabilitation performance
+- Improved UI/UX for the web interface
+- Mobile application integration
+
