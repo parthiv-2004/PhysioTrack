@@ -55,7 +55,6 @@ Sensor data is transmitted wirelessly to a Raspberry Pi server where a Flask-bas
 
 ![Website Screenshot](Images/Web1.png)
 ![Website Screenshot 2](Images/Web2.png)
-*Insert screenshot of the PhysioTrack web interface.*
 
 ---
 
