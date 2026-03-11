@@ -15,7 +15,8 @@ Sensor data is transmitted wirelessly to a Raspberry Pi server where a Flask-bas
 
 # System Architecture
 
-![System Architecture](Images/Sys Architecture.png)
+
+![System Architecture](Images/Sys_Architecture.png)
 
 
 
