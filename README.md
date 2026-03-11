@@ -17,7 +17,7 @@ Sensor data is transmitted wirelessly to a Raspberry Pi server where a Flask-bas
 
 ![System Architecture](Images/Sys Architecture.png)
 
-*Insert system architecture diagram here.*
+
 
 ---
 
@@ -37,7 +37,7 @@ Sensor data is transmitted wirelessly to a Raspberry Pi server where a Flask-bas
 
 ![Prototype](Images/Prototype.jpg)
 
-*Insert image of the hardware prototype attached to the foot or wearable sock.*
+
 
 ---
 
