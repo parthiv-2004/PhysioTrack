@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhysioTrack</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  :root {
+    --bg:#0a0f1e; --surface:#111827; --surface2:#1a2235; --border:#1f2d45;
+    --accent:#00e5ff; --accent2:#7c3aed; --good:#10b981; --warn:#f59e0b;
+    --danger:#ef4444; --text:#e2e8f0; --muted:#64748b; --card:#131c2e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .glow-blob{position:fixed;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(0,229,255,.06) 0%,transparent 70%);top:-200px;right:-200px;pointer-events:none;z-index:0;animation:blobPulse 8s ease-in-out infinite;}
+  .glow-blob2{position:fixed;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.05) 0%,transparent 70%);bottom:-100px;left:-100px;pointer-events:none;z-index:0;}
+  @keyframes blobPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.1);opacity:.7}}
+
+  header{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:20px 40px;border-bottom:1px solid var(--border);}
+  .logo{display:flex;align-items:center;gap:12px;}
+  .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+  .logo-text{font-size:20px;font-weight:800;letter-spacing:-.5px;background:linear-gradient(90deg,var(--accent),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+  nav{display:flex;gap:8px;}
+  nav a{text-decoration:none;color:var(--muted);font-size:13px;font-weight:600;letter-spacing:.5px;padding:8px 18px;border-radius:8px;border:1px solid transparent;transition:all .2s;text-transform:uppercase;}
+  nav a:hover,nav a.active{color:var(--accent);border-color:var(--accent);background:rgba(0,229,255,.06);}
+
+  main{position:relative;z-index:10;max-width:860px;margin:0 auto;padding:48px 24px;display:flex;flex-direction:column;align-items:center;gap:32px;}
+
+  /* Status card */
+  .status-card{width:100%;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;transition:border-color .3s;}
+  .status-card.connected{border-color:rgba(16,185,129,.3);}
+  .status-card.disconnected{border-color:rgba(239,68,68,.3);}
+  .status-left{display:flex;align-items:center;gap:14px;}
+  .status-dot{width:12px;height:12px;border-radius:50%;background:var(--muted);transition:background .4s;}
+  .status-dot.connected{background:var(--good);animation:pingGreen 2s ease-in-out infinite;}
+  .status-dot.disconnected{background:var(--danger);}
+  @keyframes pingGreen{0%{box-shadow:0 0 0 0 rgba(16,185,129,.4)}70%{box-shadow:0 0 0 10px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+  .status-label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  .status-value{font-size:15px;font-weight:700;font-family:'DM Mono',monospace;transition:color .3s;}
+  .status-value.connected{color:var(--good);}
+  .status-value.disconnected{color:var(--danger);}
+
+  /* Wizard */
+  .wizard-steps{width:100%;display:flex;align-items:center;}
+  .wizard-step{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;position:relative;}
+  .wizard-step:not(:last-child)::after{content:'';position:absolute;top:15px;left:50%;width:100%;height:2px;background:var(--border);z-index:0;transition:background .4s;}
+  .wizard-step.done:not(:last-child)::after{background:var(--good);}
+  .wizard-step.active:not(:last-child)::after{background:rgba(0,229,255,.3);}
+  .wizard-circle{width:30px;height:30px;border-radius:50%;border:2px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);position:relative;z-index:1;transition:all .3s;font-family:'DM Mono',monospace;}
+  .wizard-step.active .wizard-circle{border-color:var(--accent);color:var(--accent);background:rgba(0,229,255,.1);box-shadow:0 0 14px rgba(0,229,255,.3);}
+  .wizard-step.done .wizard-circle{border-color:var(--good);background:var(--good);color:#fff;}
+  .wizard-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);text-align:center;}
+  .wizard-step.active .wizard-label{color:var(--accent);}
+  .wizard-step.done .wizard-label{color:var(--good);}
+
+  /* Panel */
+  .panel{width:100%;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px;display:flex;flex-direction:column;align-items:center;gap:24px;animation:fadeIn .35s ease both;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .panel-title{font-size:22px;font-weight:800;letter-spacing:-1px;text-align:center;background:linear-gradient(160deg,#fff 30%,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+  .panel-sub{font-size:13px;color:var(--muted);text-align:center;line-height:1.6;margin-top:-12px;}
+
+  /* Name input */
+  .input-wrap{width:100%;max-width:360px;}
+  .input-label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px;}
+  .text-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;font-family:'Syne',sans-serif;font-size:16px;font-weight:600;color:var(--text);outline:none;transition:border-color .2s;}
+  .text-input:focus{border-color:var(--accent);}
+  .text-input::placeholder{color:var(--muted);}
+
+  /* Calibration */
+  .cal-list{width:100%;display:flex;flex-direction:column;gap:12px;}
+  .cal-row{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;transition:border-color .2s;}
+  .cal-row.active{border-color:var(--accent);background:rgba(0,229,255,.04);}
+  .cal-row.done{border-color:var(--good);background:rgba(16,185,129,.04);}
+  .cal-row-left{display:flex;align-items:center;gap:14px;}
+  .cal-icon{width:36px;height:36px;border-radius:10px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;}
+  .cal-row.active .cal-icon{border-color:var(--accent);background:rgba(0,229,255,.08);}
+  .cal-row.done .cal-icon{border-color:var(--good);background:rgba(16,185,129,.08);}
+  .cal-name{font-size:14px;font-weight:700;text-transform:capitalize;}
+  .cal-hint{font-size:11px;color:var(--muted);margin-top:2px;}
+  .cal-peak{font-family:'DM Mono',monospace;font-size:20px;font-weight:700;color:var(--muted);min-width:70px;text-align:right;transition:color .2s;}
+  .cal-row.active .cal-peak{color:var(--accent);}
+  .cal-row.done .cal-peak{color:var(--good);}
+  .capture-area{width:100%;display:flex;flex-direction:column;align-items:center;gap:12px;}
+  .capture-hint{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;text-align:center;}
+
+  /* Movement tracker */
+  .movements-track{width:100%;display:flex;align-items:center;}
+  .move-step{display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;flex:1;}
+  .move-step:not(:last-child)::after{content:'';position:absolute;top:18px;left:50%;width:100%;height:2px;background:var(--border);z-index:0;transition:background .4s;}
+  .move-step.done:not(:last-child)::after{background:var(--good);}
+  .move-circle{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--muted);position:relative;z-index:1;transition:all .3s;font-family:'DM Mono',monospace;}
+  .move-step.active .move-circle{border-color:var(--accent);color:var(--accent);background:rgba(0,229,255,.1);animation:pulseCircle 1.5s ease-in-out infinite;}
+  .move-step.measuring .move-circle{border-color:var(--warn);color:var(--warn);background:rgba(245,158,11,.1);animation:pulseWarn 1s ease-in-out infinite;}
+  .move-step.done .move-circle{border-color:var(--good);background:var(--good);color:#fff;}
+  @keyframes pulseCircle{0%,100%{box-shadow:0 0 16px rgba(0,229,255,.25)}50%{box-shadow:0 0 28px rgba(0,229,255,.5)}}
+  @keyframes pulseWarn{0%,100%{box-shadow:0 0 16px rgba(245,158,11,.25)}50%{box-shadow:0 0 28px rgba(245,158,11,.5)}}
+  .move-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);text-align:center;transition:color .3s;}
+  .move-step.active .move-label{color:var(--accent);}
+  .move-step.measuring .move-label{color:var(--warn);}
+  .move-step.done .move-label{color:var(--good);}
+
+  /* Current movement card */
+  .current-movement-card{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;}
+  .cm-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  .cm-name{font-size:20px;font-weight:800;color:var(--text);text-transform:capitalize;margin-top:4px;}
+  .cm-number{font-family:'DM Mono',monospace;font-size:36px;font-weight:700;color:var(--border);}
+
+  /* Person badge */
+  .person-badge{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 18px;width:100%;}
+  .person-badge-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+  .person-badge-name{font-size:16px;font-weight:800;color:var(--accent);}
+
+  /* Feedback */
+  .feedback-box{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:20px 24px;text-align:center;min-height:70px;display:flex;align-items:center;justify-content:center;transition:border-color .3s;}
+  .feedback-box.good{border-color:rgba(16,185,129,.4);}
+  .feedback-box.warn{border-color:rgba(245,158,11,.4);}
+  .feedback-box.complete{border-color:rgba(0,229,255,.4);}
+  .feedback-text{font-size:20px;font-weight:700;letter-spacing:-.5px;color:var(--text);transition:all .3s;font-family:'DM Mono',monospace;}
+  .feedback-text.good{color:var(--good);}
+  .feedback-text.warn{color:var(--warn);}
+  .feedback-text.complete{color:var(--accent);}
+
+  /* Buttons */
+  .btn-group{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;width:100%;}
+  .btn{padding:14px 32px;border-radius:12px;border:none;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+  .btn::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,0);transition:background .2s;}
+  .btn:hover::after{background:rgba(255,255,255,.07);}
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),#00b4d8);color:#0a0f1e;box-shadow:0 4px 20px rgba(0,229,255,.3);}
+  .btn-primary:hover{box-shadow:0 6px 28px rgba(0,229,255,.5);transform:translateY(-1px);}
+  .btn-success{background:linear-gradient(135deg,var(--good),#059669);color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.3);}
+  .btn-warn{background:linear-gradient(135deg,var(--warn),#d97706);color:#fff;box-shadow:0 4px 16px rgba(245,158,11,.3);}
+  .btn-danger{background:var(--surface2);color:var(--danger);border:1px solid var(--danger);}
+  .btn-danger:hover{background:rgba(239,68,68,.1);}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+  .btn:disabled{opacity:.3;cursor:not-allowed;transform:none !important;box-shadow:none !important;}
+  .hidden{display:none !important;}
+
+  @media(max-width:600px){
+    header{padding:12px 16px;}
+    .logo-text{font-size:16px;}
+    nav a{padding:6px 12px;font-size:11px;}
+
+    main{padding:16px 12px;gap:16px;}
+
+    .status-card{padding:14px 16px;}
+    .status-label{font-size:11px;}
+    .status-value{font-size:13px;}
+
+    .wizard-steps{gap:0;}
+    .wizard-circle{width:26px;height:26px;font-size:11px;}
+    .wizard-label{font-size:9px;}
+
+    .panel{padding:20px 14px;gap:16px;}
+    .panel-title{font-size:18px;}
+    .panel-sub{font-size:12px;}
+
+    .text-input{font-size:14px;padding:12px 14px;}
+
+    .cal-row{padding:12px 14px;}
+    .cal-icon{width:30px;height:30px;font-size:14px;}
+    .cal-name{font-size:13px;}
+    .cal-hint{font-size:10px;}
+    .cal-peak{font-size:16px;}
+
+    .movements-track{gap:0;}
+    .move-circle{width:30px;height:30px;font-size:12px;}
+    .move-label{font-size:9px;}
+
+    .current-movement-card{padding:14px 16px;}
+    .cm-name{font-size:16px;}
+    .cm-number{font-size:28px;}
+
+    .feedback-text{font-size:16px;}
+
+    #liveAngleBox > div{padding:12px;}
+    #liveAngleVal{font-size:26px;}
+    #liveAngleTarget{font-size:16px;}
+
+    .btn{padding:12px 20px;font-size:12px;}
+    .btn-group{gap:8px;}
+
+    .person-badge{padding:8px 14px;}
+    .person-badge-name{font-size:14px;}
+  }
+</style>
+</head>
+<body>
+<div class="glow-blob"></div><div class="glow-blob2"></div>
+
+<header>
+  <div class="logo"><div class="logo-icon">🦶</div><span class="logo-text">PhysioTrack</span></div>
+  <nav><a href="/" class="active">Session</a><a href="/data">Records</a></nav>
+</header>
+
+<main>
+
+  <!-- ESP Status -->
+  <div class="status-card" id="statusCard">
+    <div class="status-left">
+      <div class="status-dot" id="espDot"></div>
+      <div>
+        <div class="status-label">Sensor Device</div>
+        <div class="status-value" id="espStatus">Checking...</div>
+      </div>
+    </div>
+    <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);">ESP8266 / MPU6050</div>
+  </div>
+
+  <!-- Wizard -->
+  <div class="wizard-steps">
+    <div class="wizard-step" id="wStep0"><div class="wizard-circle">1</div><div class="wizard-label">Name</div></div>
+    <div class="wizard-step" id="wStep1"><div class="wizard-circle">2</div><div class="wizard-label">Calibrate</div></div>
+    <div class="wizard-step" id="wStep2"><div class="wizard-circle">3</div><div class="wizard-label">Session</div></div>
+  </div>
+
+  <!-- ── Panel 1: Name ── -->
+  <div class="panel" id="panelName">
+    <div class="panel-title">Welcome</div>
+    <p class="panel-sub">Enter your name to begin, then we'll calibrate the sensor to your range of motion.</p>
+    <div class="input-wrap">
+      <label class="input-label" for="nameInput">Your Name</label>
+      <input class="text-input" id="nameInput" type="text" placeholder="e.g. Alex Kumar" autocomplete="off"/>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" id="nameNextBtn" onclick="goToCalibration()" disabled>Next → Calibrate</button>
+    </div>
+  </div>
+
+  <!-- ── Panel 2: Calibration ── -->
+  <div class="panel hidden" id="panelCalibrate">
+    <div class="panel-title">Calibration</div>
+    <p class="panel-sub">Move each joint to its <strong style="color:var(--text)">maximum comfortable position</strong>, then press Capture.</p>
+    <div class="cal-list">
+      <div class="cal-row" id="calRow-rest">
+        <div class="cal-row-left"><div class="cal-icon">🧍</div><div><div class="cal-name">Resting Position</div><div class="cal-hint">Sit still with foot flat — captures neutral angle</div></div></div>
+        <div class="cal-peak" id="calPeak-rest">—</div>
+      </div>
+      <div class="cal-row" id="calRow-dorsiflexion">
+        <div class="cal-row-left"><div class="cal-icon">⬆️</div><div><div class="cal-name">Dorsiflexion</div><div class="cal-hint">Pull toes upward toward shin</div></div></div>
+        <div class="cal-peak" id="calPeak-dorsiflexion">—</div>
+      </div>
+      <div class="cal-row" id="calRow-plantarflexion">
+        <div class="cal-row-left"><div class="cal-icon">⬇️</div><div><div class="cal-name">Plantarflexion</div><div class="cal-hint">Point toes downward</div></div></div>
+        <div class="cal-peak" id="calPeak-plantarflexion">—</div>
+      </div>
+      <div class="cal-row" id="calRow-inversion">
+        <div class="cal-row-left"><div class="cal-icon">↙️</div><div><div class="cal-name">Inversion</div><div class="cal-hint">Turn sole inward</div></div></div>
+        <div class="cal-peak" id="calPeak-inversion">—</div>
+      </div>
+      <div class="cal-row" id="calRow-eversion">
+        <div class="cal-row-left"><div class="cal-icon">↘️</div><div><div class="cal-name">Eversion</div><div class="cal-hint">Turn sole outward</div></div></div>
+        <div class="cal-peak" id="calPeak-eversion">—</div>
+      </div>
+    </div>
+    <div class="capture-area" id="captureArea">
+      <p class="capture-hint" id="captureHint">First: sit with foot flat and still, then press Start</p>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="startCalBtn" onclick="startCalMovement()">▶ Start</button>
+        <button class="btn btn-success hidden" id="captureBtn" onclick="captureCalMovement()">✓ Capture</button>
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary hidden" id="calDoneBtn" onclick="goToSession()">Begin Session →</button>
+    </div>
+  </div>
+
+  <!-- ── Panel 3: Session ── -->
+  <div class="panel hidden" id="panelSession">
+
+    <!-- Person badge -->
+    <div class="person-badge">
+      <div><div class="person-badge-label">Current Patient</div><div class="person-badge-name" id="sessionName">—</div></div>
+    </div>
+
+    <!-- Movement progress tracker -->
+    <div class="movements-track">
+      <div class="move-step" id="step-0"><div class="move-circle">1</div><div class="move-label">Dorsi</div></div>
+      <div class="move-step" id="step-1"><div class="move-circle">2</div><div class="move-label">Plantar</div></div>
+      <div class="move-step" id="step-2"><div class="move-circle">3</div><div class="move-label">Inversion</div></div>
+      <div class="move-step" id="step-3"><div class="move-circle">4</div><div class="move-label">Eversion</div></div>
+    </div>
+
+    <!-- Current movement card -->
+    <div class="current-movement-card" id="currentMovementCard">
+      <div>
+        <div class="cm-label">Current Movement</div>
+        <div class="cm-name" id="currentMovementName">—</div>
+      </div>
+      <div class="cm-number" id="currentMovementNum">1/4</div>
+    </div>
+
+    <!-- Feedback -->
+    <div class="feedback-box" id="feedbackBox">
+      <div class="feedback-text" id="feedbackText">Press Start Session to begin</div>
+    </div>
+
+    <!-- Live angle display (shown while measuring) -->
+    <div class="hidden" id="liveAngleBox" style="width:100%;display:flex;gap:12px;">
+      <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Current Angle</div>
+        <div id="liveAngleVal" style="font-family:'DM Mono',monospace;font-size:32px;font-weight:800;color:var(--accent);">—</div>
+      </div>
+      <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Target</div>
+        <div id="liveAngleTarget" style="font-family:'DM Mono',monospace;font-size:20px;font-weight:800;color:var(--good);">—</div>
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="btn-group">
+      <!-- Initial -->
+      <button class="btn btn-primary"          id="startSessionBtn" onclick="startSession()">▶ Start Session</button>
+      <!-- Per-movement -->
+      <button class="btn btn-success hidden"    id="startMeasureBtn" onclick="startMeasuring()">⚡ Start Measuring</button>
+      <!-- Post-cycle -->
+      <button class="btn btn-secondary hidden"  id="continueBtn"     onclick="continueCycle()">↺ Continue Cycle</button>
+      <!-- Always visible during session -->
+      <button class="btn btn-danger hidden"     id="endBtn"          onclick="endSession()">■ End Session</button>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+  const calMovements = ["rest","dorsiflexion","plantarflexion","inversion","eversion"];
+  const movementNames = ["dorsiflexion","plantarflexion","inversion","eversion"];
+  let calIndex    = 0;
+  let sessionPoll = null;
+  let personName  = "";
+  let sessionIdx  = 0;   // local mirror of server movement_index
+
+  // ── WebSocket ────────────────────────────────────────────────
+  const socket = io();
+
+  socket.on('cal_peak', function(d) {
+    const el = document.getElementById('calPeak-' + d.movement);
+    if (el) el.textContent = d.peak + '°';
+  });
+
+  socket.on('live_angle', function(d) {
+    document.getElementById('liveAngleVal').textContent    = d.angle + '°';
+    document.getElementById('liveAngleTarget').textContent = d.target + '°';
+  });
+
+  socket.on('feedback', function(d) {
+    handleFeedback(d.text, d.type);
+  });
+
+  // ── ESP status ───────────────────────────────────────────────
+  function checkESP() {
+    fetch('/esp_status').then(r=>r.json()).then(d=>{
+      const ok = d.connected;
+      document.getElementById('espDot').className    = 'status-dot '+(ok?'connected':'disconnected');
+      document.getElementById('statusCard').className = 'status-card '+(ok?'connected':'disconnected');
+      const sv = document.getElementById('espStatus');
+      sv.className   = 'status-value '+(ok?'connected':'disconnected');
+      sv.textContent = ok ? 'Connected' : 'Disconnected';
+      syncNameBtn();
+    }).catch(()=>{
+      document.getElementById('espDot').className     = 'status-dot disconnected';
+      document.getElementById('statusCard').className  = 'status-card disconnected';
+      document.getElementById('espStatus').className   = 'status-value disconnected';
+      document.getElementById('espStatus').textContent = 'Disconnected';
+      document.getElementById('nameNextBtn').disabled  = true;
+    });
+  }
+  checkESP();
+  setInterval(checkESP, 3000);
+
+  document.getElementById('nameInput').addEventListener('input', syncNameBtn);
+  function syncNameBtn() {
+    const hasName   = document.getElementById('nameInput').value.trim().length > 0;
+    const connected = document.getElementById('espDot').classList.contains('connected');
+    document.getElementById('nameNextBtn').disabled = !(hasName && connected);
+  }
+
+  // ── Wizard ───────────────────────────────────────────────────
+  function setWizard(active) {
+    for (let i=0;i<3;i++) {
+      const s = document.getElementById('wStep'+i);
+      s.className = 'wizard-step';
+      if (i < active)      s.classList.add('done');
+      else if (i===active) s.classList.add('active');
+    }
+  }
+  function showPanel(id) {
+    ['panelName','panelCalibrate','panelSession'].forEach(p=>
+      document.getElementById(p).classList.add('hidden')
+    );
+    document.getElementById(id).classList.remove('hidden');
+  }
+
+  // ── Step 1 → 2 ───────────────────────────────────────────────
+  function goToCalibration() {
+    personName = document.getElementById('nameInput').value.trim();
+    setWizard(1);
+    showPanel('panelCalibrate');
+    highlightCalRow(0);
+    document.getElementById('captureHint').textContent = 'First: sit with foot flat and still, then press Start';
+  }
+
+  function highlightCalRow(index) {
+    calMovements.forEach((mv,i)=>{
+      const row = document.getElementById('calRow-'+mv);
+      row.className = 'cal-row';
+      if (i < index)   row.classList.add('done');
+      if (i === index) row.classList.add('active');
+    });
+  }
+
+  // ── Calibration ──────────────────────────────────────────────
+  function startCalMovement() {
+    const mv = calMovements[calIndex];
+    fetch('/calibrate/start',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({movement: mv, name: personName})
+    }).then(()=>{
+      document.getElementById('startCalBtn').classList.add('hidden');
+      document.getElementById('captureBtn').classList.remove('hidden');
+      const hint = mv === 'rest'
+        ? 'Keep foot flat and still, then press Capture…'
+        : 'Hold max position, then press Capture…';
+      document.getElementById('captureHint').textContent = hint;
+      document.getElementById('calPeak-'+mv).textContent = mv === 'rest' ? 'reading...' : '0.0°';
+    });
+  }
+
+  function captureCalMovement() {
+    const mv = calMovements[calIndex];
+    const url = mv === 'rest' ? '/calibrate/capture_rest' : '/calibrate/capture';
+    fetch(url,{method:'POST'}).then(r=>r.json()).then(d=>{
+      if (mv === 'rest') {
+        document.getElementById('calPeak-rest').textContent = d.rest_dp + '°';
+      } else {
+        document.getElementById('calPeak-'+d.movement).textContent = d.peak+'°';
+      }
+      document.getElementById('calRow-'+mv).className = 'cal-row done';
+      document.getElementById('captureBtn').classList.add('hidden');
+      calIndex++;
+      if (calIndex < calMovements.length) {
+        const next = calMovements[calIndex];
+        highlightCalRow(calIndex);
+        const hint = next === 'rest'
+          ? 'Sit with foot flat, then press Start'
+          : `Great! Now move to max ${next}`;
+        document.getElementById('captureHint').textContent = hint;
+        document.getElementById('startCalBtn').classList.remove('hidden');
+        document.getElementById('startCalBtn').textContent = '▶ Start';
+      } else {
+        fetch('/calibrate/done',{method:'POST'});
+        document.getElementById('captureArea').classList.add('hidden');
+        document.getElementById('calDoneBtn').classList.remove('hidden');
+      }
+    });
+  }
+
+  // ── Step 2 → 3 ───────────────────────────────────────────────
+  function goToSession() {
+    setWizard(2);
+    showPanel('panelSession');
+    document.getElementById('sessionName').textContent = personName;
+  }
+
+  // ── Session helpers ──────────────────────────────────────────
+  function setFeedback(text, type='') {
+    document.getElementById('feedbackBox').className  = 'feedback-box '+type;
+    document.getElementById('feedbackText').className = 'feedback-text '+type;
+    document.getElementById('feedbackText').textContent = text;
+  }
+
+  function updateSteps(activeIndex, measuring=false) {
+    for (let i=0; i<4; i++) {
+      const s = document.getElementById('step-'+i);
+      s.className = 'move-step';
+      if (i < activeIndex)        s.classList.add('done');
+      else if (i === activeIndex) s.classList.add(measuring ? 'measuring' : 'active');
+    }
+  }
+
+  function resetSteps() {
+    for (let i=0;i<4;i++) document.getElementById('step-'+i).className = 'move-step';
+  }
+
+  function updateCurrentMovementCard(idx) {
+    const name = idx < 4 ? movementNames[idx] : '—';
+    document.getElementById('currentMovementName').textContent = name;
+    document.getElementById('currentMovementNum').textContent  = idx < 4 ? `${idx+1}/4` : '✓';
+  }
+
+  function showBtns(...ids) {
+    ['startSessionBtn','startMeasureBtn','continueBtn','endBtn'].forEach(id=>
+      document.getElementById(id).classList.add('hidden')
+    );
+    ids.forEach(id=>document.getElementById(id).classList.remove('hidden'));
+  }
+
+  // ── Session flow ─────────────────────────────────────────────
+  function startSession() {
+    fetch('/start_session',{method:'POST'}).then(r=>r.json()).then(()=>{
+      sessionIdx = 0;
+      resetSteps();
+      updateSteps(0);
+      updateCurrentMovementCard(0);
+      setFeedback(`Ready for Dorsiflexion — press Start Measuring`, '');
+      showBtns('startMeasureBtn','endBtn');
+      startSessionPoll();
+    });
+  }
+
+  function continueCycle() {
+    fetch('/continue',{method:'POST'}).then(r=>r.json()).then(()=>{
+      sessionIdx = 0;
+      resetSteps();
+      updateSteps(0);
+      updateCurrentMovementCard(0);
+      setFeedback(`Ready for Dorsiflexion — press Start Measuring`, '');
+      showBtns('startMeasureBtn','endBtn');
+      startSessionPoll();
+    });
+  }
+
+  function hideLiveAngle() {
+    document.getElementById('liveAngleBox').classList.add('hidden');
+    document.getElementById('liveAngleVal').textContent    = '—';
+    document.getElementById('liveAngleTarget').textContent = '—';
+  }
+
+  function startMeasuring() {
+    fetch('/start_measuring',{method:'POST'}).then(r=>r.json()).then(d=>{
+      updateSteps(sessionIdx, true);
+      setFeedback(`Measuring ${d.movement}...`, 'warn');
+      document.getElementById('liveAngleBox').classList.remove('hidden');
+      document.getElementById('liveAngleVal').textContent    = '—';
+      document.getElementById('liveAngleTarget').textContent = '—';
+      showBtns('endBtn');
+    });
+  }
+
+  function endSession() {
+    fetch('/end_session',{method:'POST'}).then(r=>r.json()).then(d=>{
+      stopSessionPoll();
+      resetSteps();
+      updateCurrentMovementCard(4);
+      setFeedback('Session saved. Well done! 🎉','complete');
+      showBtns();  // hide all
+      // Reset wizard after 3s
+      setTimeout(()=>{
+        calIndex = 0;
+        ['rest',...calMovements].forEach(mv=>{
+          const row = document.getElementById('calRow-'+mv);
+          if (row) row.className = 'cal-row';
+          const peak = document.getElementById('calPeak-'+mv);
+          if (peak) peak.textContent = '—';
+        });
+        highlightCalRow(0);
+        document.getElementById('captureArea').classList.remove('hidden');
+        document.getElementById('calDoneBtn').classList.add('hidden');
+        document.getElementById('startCalBtn').classList.remove('hidden');
+        document.getElementById('captureBtn').classList.add('hidden');
+        document.getElementById('captureHint').textContent = 'First: sit with foot flat and still, then press Start';
+        document.getElementById('nameInput').value = '';
+        setWizard(0);
+        showPanel('panelName');
+        syncNameBtn();
+      }, 3000);
+    });
+  }
+
+  // ── Feedback handler ─────────────────────────────────────────
+  function handleFeedback(fb, type) {
+    if (!fb || fb === 'waiting') return;
+
+    if (fb.includes('Good Job') || fb.includes('Next:')) {
+      sessionIdx++;
+      updateSteps(sessionIdx);
+      updateCurrentMovementCard(sessionIdx);
+      const nextName = sessionIdx < 4 ? movementNames[sessionIdx] : '';
+      setFeedback(`✓ Done! Ready for ${nextName} — press Start Measuring`, 'good');
+      hideLiveAngle();
+      showBtns('startMeasureBtn','endBtn');
+
+    } else if (fb.includes('Cycle Complete')) {
+      updateSteps(4);
+      updateCurrentMovementCard(4);
+      setFeedback('Cycle Complete! 🎯','complete');
+      hideLiveAngle();
+      showBtns('continueBtn','endBtn');
+      stopSessionPoll();
+
+    } else if (fb.includes('Move More')) {
+      setFeedback('↑ Move More — keep going!','warn');
+
+    } else if (fb.includes('Too Much')) {
+      setFeedback('↓ Too Much — ease back','warn');
+    }
+  }
+
+  // ── Polling (fallback) ───────────────────────────────────────
+  function startSessionPoll() {
+    if (sessionPoll) clearInterval(sessionPoll);
+    sessionPoll = setInterval(()=>{
+      fetch('/status').then(r=>r.json()).then(d=>{
+        handleFeedback(d.feedback,'');
+      });
+    }, 2000);
+  }
+
+  function stopSessionPoll() {
+    if (sessionPoll){clearInterval(sessionPoll);sessionPoll=null;}
+  }
+</script>
+</body>
+</html>
