@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhysioTrack — {{ name }} Progress</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#0a0f1e;--surface:#111827;--surface2:#1a2235;--border:#1f2d45;--accent:#00e5ff;--accent2:#7c3aed;--good:#10b981;--warn:#f59e0b;--text:#e2e8f0;--muted:#64748b;--card:#131c2e;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+  header{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+  .logo-text{font-size:18px;font-weight:800;background:linear-gradient(90deg,var(--accent),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+  .back-btn{text-decoration:none;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:8px 16px;border:1px solid var(--border);border-radius:8px;transition:all .2s;}
+  .back-btn:hover{color:var(--accent);border-color:var(--accent);}
+
+  main{position:relative;z-index:10;max-width:960px;width:100%;margin:0 auto;padding:28px 20px 60px;}
+
+  .page-header{margin-bottom:28px;}
+  .page-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  .patient-name{font-size:30px;font-weight:800;letter-spacing:-1px;color:var(--accent);margin-top:4px;}
+
+  .graphs-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+
+  .chart-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 20px 28px;}
+  .chart-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+  .chart-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .chart-label{font-size:13px;font-weight:800;color:var(--text);}
+  .chart-wrap{position:relative;width:100%;height:220px;}
+
+  @media(max-width:650px){
+    .graphs-grid{grid-template-columns:1fr;}
+    .chart-wrap{height:200px;}
+    main{padding:20px 14px 50px;}
+    .patient-name{font-size:22px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🦶</div>
+    <span class="logo-text">PhysioTrack</span>
+  </div>
+  <a href="/data" class="back-btn">← Records</a>
+</header>
+
+<main>
+  <div class="page-header">
+    <div class="page-title">Progress Over Time · {{ leg | upper }} LEG</div>
+    <div class="patient-name">{{ name }}</div>
+  </div>
+
+  <div class="graphs-grid">
+
+    <!-- Dorsiflexion -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-dot" style="background:#00e5ff;"></div>
+        <div class="chart-label">Dorsiflexion</div>
+      </div>
+      <div class="chart-wrap"><canvas id="c1"></canvas></div>
+    </div>
+
+    <!-- Plantarflexion -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-dot" style="background:#f59e0b;"></div>
+        <div class="chart-label">Plantarflexion</div>
+      </div>
+      <div class="chart-wrap"><canvas id="c2"></canvas></div>
+    </div>
+
+    <!-- Inversion -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-dot" style="background:#a78bfa;"></div>
+        <div class="chart-label">Inversion</div>
+      </div>
+      <div class="chart-wrap"><canvas id="c3"></canvas></div>
+    </div>
+
+    <!-- Eversion -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-dot" style="background:#10b981;"></div>
+        <div class="chart-label">Eversion</div>
+      </div>
+      <div class="chart-wrap"><canvas id="c4"></canvas></div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  const g = {{ graph | safe }};
+
+  function makeChart(id, label, data, color) {
+    const ctx = document.getElementById(id).getContext('2d');
+    // Compute y-axis range with padding
+    const vals   = data.filter(v => v !== null);
+    const minVal = Math.max(0,   Math.floor(Math.min(...vals) / 10) * 10 - 10);
+    const maxVal = Math.min(180, Math.ceil( Math.max(...vals) / 10) * 10 + 10);
+
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: g.labels,
+        datasets: [{
+          label: label,
+          data:  data,
+          borderColor:     color,
+          backgroundColor: color.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+          tension: 0.3,
+          pointRadius: 5,
+          pointHoverRadius: 8,
+          pointBackgroundColor: color,
+          pointBorderColor: '#0a0f1e',
+          pointBorderWidth: 2,
+          fill: true,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#111827',
+            titleColor: '#e2e8f0',
+            bodyColor: '#94a3b8',
+            borderColor: color,
+            borderWidth: 1,
+            callbacks: {
+              title: items => 'Session ' + (items[0].dataIndex + 1) + ' — ' + g.labels[items[0].dataIndex],
+              label: item  => ' ' + label + ': ' + item.parsed.y + '°'
+            }
+          },
+          // Show value above each data point
+          datalabels: false
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: '#64748b',
+              font: { family:'DM Mono', size: 9 },
+              maxRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 6
+            },
+            grid: { color: 'rgba(255,255,255,.04)' },
+            border: { color: 'rgba(255,255,255,.06)' }
+          },
+          y: {
+            min: minVal,
+            max: maxVal,
+            ticks: {
+              color: '#64748b',
+              font: { family:'DM Mono', size: 9 },
+              callback: v => v + '°',
+              stepSize: 10
+            },
+            grid:   { color: 'rgba(255,255,255,.05)' },
+            border: { color: 'rgba(255,255,255,.06)' }
+          }
+        }
+      },
+      // Draw angle value above each point
+      plugins: [{
+        id: 'pointLabels',
+        afterDatasetsDraw(chart) {
+          const { ctx, data } = chart;
+          chart.data.datasets.forEach((dataset, i) => {
+            const meta = chart.getDatasetMeta(i);
+            meta.data.forEach((point, index) => {
+              const val = dataset.data[index];
+              if (val === null || val === undefined) return;
+              ctx.save();
+              ctx.font = '700 10px DM Mono, monospace';
+              ctx.fillStyle = dataset.borderColor;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              ctx.fillText(val + '°', point.x, point.y - 8);
+              ctx.restore();
+            });
+          });
+        }
+      }]
+    });
+  }
+
+  makeChart('c1', 'Dorsiflexion',   g.dorsi,  '#00e5ff');
+  makeChart('c2', 'Plantarflexion', g.plantar, '#f59e0b');
+  makeChart('c3', 'Inversion',      g.inv,     '#a78bfa');
+  makeChart('c4', 'Eversion',       g.eve,     '#10b981');
+</script>
+</body>
+</html>
