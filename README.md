@@ -2,7 +2,6 @@
 
 PhysioTrack is a low-cost IoT-based ankle rehabilitation monitoring system designed to assist physiotherapy patients in performing rehabilitation exercises accurately while enabling physiotherapists to monitor progress in real time. The system combines wearable inertial sensing, wireless communication, embedded processing, and a responsive web dashboard to provide quantitative ankle joint movement analysis during rehabilitation sessions.
 
-The project was developed as part of a Bachelor of Technology final-year project in Electronics and Instrumentation Engineering at FISAT.
 
 ---
 
