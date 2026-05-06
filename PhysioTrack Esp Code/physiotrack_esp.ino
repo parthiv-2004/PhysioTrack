@@ -5,10 +5,10 @@
 
 MPU6050 mpu;
 
-const char* ssid         = "Parthiv's S23";
-const char* password     = "Parthiv@02";
-const char* uploadURL    = "http://10.166.166.44:5000/upload";
-const char* heartbeatURL = "http://10.166.166.44:5000/esp_heartbeat";
+const char* ssid         = "ENTER SSID";
+const char* password     = "ENTER PASSWORD";
+const char* uploadURL    = "http://10.166.166.44:5000/upload";     //Replace 10.166.166.44 with your own server IP Address
+const char* heartbeatURL = "http://10.166.166.44:5000/esp_heartbeat";   //Replace 10.166.166.44 with your own server IP Address
 
 WiFiClient client;
 HTTPClient http;
