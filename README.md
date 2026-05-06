@@ -81,7 +81,7 @@ The system tracks four clinically significant ankle rehabilitation movements:
 
 # Power Supply Architecture
 
-![Power Architecture](Images/Power_Architecture.png)
+![Power Architecture](Images/Sys_Architecture.png)
 
 The portable hardware system is powered using:
 
